@@ -1,4 +1,4 @@
-# IT Glue Backup to Google Drive (Python Rewrite)
+# IT Glue Export
 
 This repository contains a native Python rewrite of the legacy PowerShell script for exporting IT Glue data and uploading the resulting ZIP archives to Google Drive. It leverages the official IT Glue Exports API and runs on Linux.
 
@@ -83,7 +83,7 @@ This script will:
 To automate this backup weekly (for example, every Sunday at 2:00 AM), add the following line to your system's crontab:
 
 ```cron
-0 2 * * 0 "/home/jeff/Projects/Work Projects/IT GLue backup tests/run_backup.sh" >> "/home/jeff/Projects/Work Projects/IT GLue backup tests/cron.log" 2>&1
+0 2 * * 0 "/home/jeff/Projects/Work Projects/IT Glue Export/run_backup.sh" >> "/home/jeff/Projects/Work Projects/IT Glue Export/cron.log" 2>&1
 ```
 
 To edit your crontab, run:
