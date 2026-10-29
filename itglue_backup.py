@@ -77,6 +77,10 @@ class Configuration:
         include_logs_str = os.getenv("ITGLUE_INCLUDE_LOGS", "false").lower()
         self.include_logs = include_logs_str in ("true", "1", "yes")
 
+        # Parse include-passwords option
+        include_passwords_str = os.getenv("ITGLUE_INCLUDE_PASSWORDS", "true").lower()
+        self.include_passwords = include_passwords_str in ("true", "1", "yes")
+
         # Google Drive settings
         self.gdrive_credentials_file = os.getenv("GDRIVE_CREDENTIALS_FILE", "service-account.json")
         self.gdrive_folder_id = os.getenv("GDRIVE_FOLDER_ID")
@@ -131,7 +135,8 @@ class ITGlueClient:
         
         # Construct JSON API standard payload
         attributes: Dict[str, Any] = {
-            "include-logs": self.config.include_logs
+            "include-logs": self.config.include_logs,
+            "include-passwords": self.config.include_passwords
         }
         
         if self.config.org_id:
