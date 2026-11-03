@@ -1,23 +1,18 @@
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
 *.py[cod]
-*$py.class
-
-# Virtual environments
-venv/
 .venv/
-env/
-ENV/
+venv/
+.pytest_cache/
+dist/
 
-# Environment configuration and credentials
+# Credentials
 .env
-*.json
-!requirements.txt  # Ensure we don't accidentally ignore json configurations that are needed, but service-account.json should be ignored. Actually, it's safer to specify service-account.json or similar.
-# Let's specify exact credential files to ignore:
 service-account.json
 credentials.json
 
-# Temporary files and backup/export outputs
+# Backup outputs
 temp/
+exports/
 *.zip
 *.log

@@ -1,0 +1,31 @@
+[project]
+name = "it-glue-export"
+version = "1.0.0"
+description = "Back up IT Glue with the Exports API and build a searchable single-file index"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.13"
+dependencies = [
+    "requests>=2.31.0",
+    "python-dotenv>=1.0.1",
+]
+
+[project.optional-dependencies]
+gdrive = [
+    "google-api-python-client>=2.120.0",
+    "google-auth>=2.28.0",
+]
+s3 = ["boto3>=1.34"]
+
+[project.scripts]
+itglue-export = "itglue_export.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["uv_build>=0.9,<0.13"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "itglue_export"
