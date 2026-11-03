@@ -68,6 +68,21 @@ This script will:
 
 ---
 
+## Building a Browsable Index
+
+Extract a backup ZIP, then build one self-contained `index.html` at the export root:
+```bash
+uv run itglue-export index path/to/extracted-export
+```
+
+### Options
+- `-o PATH`: Write the index somewhere other than `<export_dir>/index.html`.
+- `--include-logs`: Fold `logs.csv` (the activity audit trail, usually the largest table) into the index.
+
+The export directory is only read. Passwords and other secret columns are masked behind a click-to-reveal control.
+
+---
+
 ## Automation (Weekly Cron Job)
 
 To automate this backup weekly (for example, every Sunday at 2:00 AM), add the following line to your system's crontab:
