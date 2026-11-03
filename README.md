@@ -5,8 +5,7 @@ This repository contains a native Python rewrite of the legacy PowerShell script
 ## Features
 - **IT Glue Exports API Integration**: Triggers a full account export (which includes documents and attachments), polls asynchronously for completion, and downloads the ZIP file.
 - **Google Drive Upload**: Authenticates using a Google Cloud Service Account and performs a chunked/resumable upload of the backup file.
-- **SOLID Architecture**: Built using OOP principles, with separated concerns for API interaction, file uploading, and orchestration.
-- **Automatic Environment Setup**: The included `run_backup.sh` wrapper script automatically manages a Python virtual environment and installs dependencies.
+- **Automatic Environment Setup**: The included `run_backup.sh` wrapper runs the `itglue-export` command through [uv](https://docs.astral.sh/uv/), which creates the virtual environment and installs dependencies on first run.
 - **Resource Cleanup**: Deletes the local temporary ZIP file after upload (even if the upload fails) to prevent disk space exhaustion.
 
 ---
@@ -14,11 +13,7 @@ This repository contains a native Python rewrite of the legacy PowerShell script
 ## Installation & Setup
 
 ### 1. Clone & Prepare Directory
-Make sure this directory contains:
-- [itglue_backup.py](file:///home/jeff/Projects/Work%20Projects/IT%20GLue%20backup%20tests/itglue_backup.py)
-- [requirements.txt](file:///home/jeff/Projects/Work%20Projects/IT%20GLue%20backup%20tests/requirements.txt)
-- [run_backup.sh](file:///home/jeff/Projects/Work%20Projects/IT%20GLue%20backup%20tests/run_backup.sh)
-- [README.md](file:///home/jeff/Projects/Work%20Projects/IT%20GLue%20backup%20tests/README.md)
+Install [uv](https://docs.astral.sh/uv/). Everything else is installed on first run.
 
 ### 2. Configure Environment Variables
 Copy `.env.example` to `.env` and update the values:
@@ -52,29 +47,24 @@ You can run the backup manually at any time by executing the runner script:
 ```
 
 ### Options
-- `--simple`: Skip post-processing/HTML report generation and keep/upload the raw ZIP archive directly.
-- `--local`: Save the final ZIP file locally (under `./temp` directory) and skip uploading it to Google Drive. (Google Drive environment variables are not validated or required when this option is used).
+- `--env PATH`: Use a `.env` file other than `./.env`.
+- `--local`: Save the ZIP file locally (under `./temp`) and skip uploading it to Google Drive. (Google Drive environment variables are not validated or required when this option is used).
+- `--simple`: Deprecated no-op, kept so existing cron lines keep working. The raw ZIP archive is now always what gets stored.
 
 ### Examples
-- **Standard Run (HTML reports + Google Drive upload)**:
+- **Standard Run (Google Drive upload)**:
   ```bash
   ./run_backup.sh
   ```
-- **Local Run with HTML reports**:
+- **Local Run**:
   ```bash
   ./run_backup.sh --local
   ```
-- **Local Run (raw ZIP archive only)**:
-  ```bash
-  ./run_backup.sh --local --simple
-  ```
 
 This script will:
-1. Initialize the Python virtual environment (`venv`) if it doesn't exist.
-2. Install/upgrade packages from `requirements.txt`.
-3. Create a `./temp` folder.
-4. Execute `itglue_backup.py` with any forwarded arguments.
-5. Save the processed ZIP locally (if `--local` is active) or upload it to Google Drive and delete the temporary ZIP.
+1. Create a `./temp` folder.
+2. Run `uv run itglue-export backup` with any forwarded arguments (uv sets up `.venv` on first run).
+3. Save the ZIP locally (if `--local` is active) or upload it to Google Drive and delete the temporary ZIP.
 
 ---
 
