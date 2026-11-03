@@ -30,6 +30,10 @@ class Configuration:
         self.gdrive_credentials_file = os.getenv("GDRIVE_CREDENTIALS_FILE", "service-account.json")
         self.gdrive_folder_id = os.getenv("GDRIVE_FOLDER_ID")
 
+        # Setting S3_BUCKET selects the S3 backend; AWS credentials and region come from boto3's usual sources.
+        self.s3_bucket = os.getenv("S3_BUCKET")
+        self.s3_prefix = os.getenv("S3_PREFIX", "")
+
         self.local_temp_dir = Path(os.getenv("LOCAL_TEMP_DIR", "./temp"))
         self.local = local
 
@@ -37,7 +41,7 @@ class Configuration:
         missing = []
         if not self.api_key:
             missing.append("ITGLUE_API_KEY")
-        if not self.local:
+        if not self.local and not self.s3_bucket:
             if not self.gdrive_folder_id:
                 missing.append("GDRIVE_FOLDER_ID")
             if not os.path.exists(self.gdrive_credentials_file):
