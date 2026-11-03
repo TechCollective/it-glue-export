@@ -40,3 +40,27 @@ def test_verify_failure_stores_nothing(config):
         with pytest.raises(VerifyError):
             orch.run()
     assert storage.stored == []
+
+
+class FakeStreamingStorage:
+    def __init__(self):
+        self.streamed = []
+
+    def store_stream(self, download_url, filename):
+        self.streamed.append((download_url, filename))
+        return f"s3://x/{filename}"
+
+
+def test_streaming_backend_skips_local_download_and_verify(config):
+    storage = FakeStreamingStorage()
+    orch = BackupOrchestrator(config, storage=storage)
+    orch.client = MagicMock()
+    orch.client.trigger_export.return_value = "42"
+    orch.client.poll_export_status.return_value = "https://dl.example.test/x.zip"
+    with patch("itglue_export.orchestrator.verify_archive") as verify:
+        orch.run()
+    orch.client.download_export.assert_not_called()
+    verify.assert_not_called()
+    assert len(storage.streamed) == 1
+    assert storage.streamed[0][0] == "https://dl.example.test/x.zip"
+    assert storage.streamed[0][1].startswith("itglue-backup-") and storage.streamed[0][1].endswith(".zip")

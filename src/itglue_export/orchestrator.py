@@ -4,7 +4,7 @@ from pathlib import Path
 
 from .client import ITGlueClient
 from .config import Configuration
-from .storage import LocalStorage, Storage
+from .storage import LocalStorage, Storage, StreamingStorage
 from .verify import verify_archive
 
 logger = logging.getLogger(__name__)
@@ -13,12 +13,16 @@ logger = logging.getLogger(__name__)
 class BackupOrchestrator:
     """Run the pipeline: trigger, poll, download, verify, store, clean up."""
 
-    def __init__(self, config: Configuration, storage: Storage | None = None):
+    def __init__(self, config: Configuration, storage: Storage | StreamingStorage | None = None):
         self.config = config
         self.client = ITGlueClient(config)
         if storage is None:
             if config.local:
                 storage = LocalStorage()
+            elif config.s3_bucket:
+                from .storage.s3 import S3Storage
+
+                storage = S3Storage(config)
             else:
                 from .storage.gdrive import GoogleDriveStorage
 
@@ -35,10 +39,15 @@ class BackupOrchestrator:
             self.config.validate()
             export_id = self.client.trigger_export()
             download_url = self.client.poll_export_status(export_id)
-            archive = self.config.local_temp_dir / f"itglue-backup-{time.strftime('%Y%m%d-%H%M%S')}.zip"
-            expected_size = self.client.download_export(download_url, archive)
-            verify_archive(archive, password=self.config.zip_password, expected_size=expected_size)
-            self.storage.store(archive)
+            filename = f"itglue-backup-{time.strftime('%Y%m%d-%H%M%S')}.zip"
+            if isinstance(self.storage, StreamingStorage):
+                logger.info("Streaming backend: no local copy, so archive verification happens downstream.")
+                self.storage.store_stream(download_url, filename)
+            else:
+                archive = self.config.local_temp_dir / filename
+                expected_size = self.client.download_export(download_url, archive)
+                verify_archive(archive, password=self.config.zip_password, expected_size=expected_size)
+                self.storage.store(archive)
             logger.info("IT Glue backup completed successfully.")
         finally:
             if not self.config.local and archive and archive.exists():

@@ -26,6 +26,7 @@ Edit `.env` with your actual credentials:
 - `ITGLUE_ZIP_PASSWORD`: (Recommended) A password to encrypt the resulting ZIP file.
 - `GDRIVE_CREDENTIALS_FILE`: The path to your Google Cloud Service Account credentials JSON file.
 - `GDRIVE_FOLDER_ID`: The ID of the Google Drive folder where backups should be uploaded.
+- `S3_BUCKET` / `S3_PREFIX`: (Optional) Set `S3_BUCKET` to stream the export straight into S3 as a multipart upload instead of Google Drive. Needs the `[s3]` extra (`uv sync --extra s3`); AWS credentials and region come from the usual AWS sources. Nothing is written to local disk on this path, so archive verification is left to whatever consumes the bucket.
 
 ### 3. Google Drive Service Account Setup
 To upload to Google Drive without user interaction:
