@@ -1,6 +1,8 @@
 import argparse
 import logging
+import shutil
 import sys
+import zipfile
 from pathlib import Path
 
 from .config import Configuration
@@ -19,8 +21,9 @@ def build_parser() -> argparse.ArgumentParser:
     backup.add_argument("--simple", action="store_true", help="Deprecated no-op: the raw archive is now always what gets stored")
 
     index = sub.add_parser("index", help="Build a single-file index.html from an extracted export.")
-    index.add_argument("export_dir", nargs="?", default="temp", help="Root of the extracted IT Glue export (default: temp)")
+    index.add_argument("export_dir", nargs="?", default="temp", help="Extracted IT Glue export directory, or a backup ZIP to extract first (default: temp)")
     index.add_argument("-o", "--output", help="Output path (default: <export_dir>/index.html)")
+    index.add_argument("--password", help="Password of the backup ZIP, when extracting one")
     index.add_argument("--include-logs", action="store_true", help="Include logs.csv (activity audit trail, ~12k rows)")
     return parser
 
@@ -46,10 +49,31 @@ def _backup(args: argparse.Namespace) -> int:
     return 0
 
 
+def _extract(archive: Path, password: str | None) -> Path:
+    """Extract a Raw Archive into a sibling folder named after it; the archive itself is only read."""
+    if not zipfile.is_zipfile(archive):
+        raise ValueError(f"{archive} is not a ZIP archive")
+    target = archive.with_suffix("")
+    print(f"Extracting {archive.name} to {target} ...")
+    with zipfile.ZipFile(archive) as zf:
+        try:
+            zf.extractall(target, pwd=password.encode("utf-8") if password else None)
+        except RuntimeError as e:  # zipfile reports a bad or missing password this way
+            shutil.rmtree(target, ignore_errors=True)
+            raise ValueError(f"could not extract {archive.name}: {e}") from e
+    return target
+
+
 def _index(args: argparse.Namespace) -> int:
     from .index import build_payload, render
 
     export_dir = Path(args.export_dir).expanduser().resolve()
+    if export_dir.is_file():
+        try:
+            export_dir = _extract(export_dir, args.password)
+        except ValueError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
     if not export_dir.is_dir():
         print(f"error: {export_dir} is not a directory", file=sys.stderr)
         return 1

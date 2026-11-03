@@ -71,13 +71,17 @@ This script will:
 
 ## Building a Browsable Index
 
-Extract a backup ZIP, then build one self-contained `index.html` at the export root:
+Build one self-contained `index.html` at the export root, from an extracted export or straight from a backup ZIP:
 ```bash
 uv run itglue-export index path/to/extracted-export
+uv run itglue-export index itglue-backup-20260101-000000.zip --password "$ITGLUE_ZIP_PASSWORD"
 ```
+
+Given a ZIP, the command extracts it into a sibling folder named after the archive and builds the index there. The ZIP itself is never modified.
 
 ### Options
 - `-o PATH`: Write the index somewhere other than `<export_dir>/index.html`.
+- `--password PW`: Password of the backup ZIP, when extracting one.
 - `--include-logs`: Fold `logs.csv` (the activity audit trail, usually the largest table) into the index.
 
 The export directory is only read. Passwords and other secret columns are masked behind a click-to-reveal control.
