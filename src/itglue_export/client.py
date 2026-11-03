@@ -118,8 +118,8 @@ class ITGlueClient:
 
         raise TimeoutError(f"Export job did not complete within the {timeout_min} minute timeout period.")
 
-    def download_export(self, download_url: str, output_path: Path) -> None:
-        """Stream the export archive to output_path."""
+    def download_export(self, download_url: str, output_path: Path) -> int | None:
+        """Stream the export archive to output_path. Returns the server's Content-Length, if it sent one."""
         logger.info(f"Downloading archive from {download_url}...")
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -143,3 +143,4 @@ class ITGlueClient:
                     last_log_time = now
 
         logger.info(f"Download completed successfully. Saved to: {output_path}")
+        return total or None

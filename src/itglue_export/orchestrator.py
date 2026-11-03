@@ -5,12 +5,13 @@ from pathlib import Path
 from .client import ITGlueClient
 from .config import Configuration
 from .storage import LocalStorage, Storage
+from .verify import verify_archive
 
 logger = logging.getLogger(__name__)
 
 
 class BackupOrchestrator:
-    """Run the pipeline: trigger, poll, download, store, clean up."""
+    """Run the pipeline: trigger, poll, download, verify, store, clean up."""
 
     def __init__(self, config: Configuration, storage: Storage | None = None):
         self.config = config
@@ -35,7 +36,8 @@ class BackupOrchestrator:
             export_id = self.client.trigger_export()
             download_url = self.client.poll_export_status(export_id)
             archive = self.config.local_temp_dir / f"itglue-backup-{time.strftime('%Y%m%d-%H%M%S')}.zip"
-            self.client.download_export(download_url, archive)
+            expected_size = self.client.download_export(download_url, archive)
+            verify_archive(archive, password=self.config.zip_password, expected_size=expected_size)
             self.storage.store(archive)
             logger.info("IT Glue backup completed successfully.")
         finally:
