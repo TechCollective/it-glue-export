@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+import requests
 
 from itglue_export.storage import s3
 from itglue_export.storage.s3 import S3Storage
@@ -56,3 +57,14 @@ def test_config_selects_s3_without_gdrive_settings(monkeypatch):
     monkeypatch.setenv("S3_BUCKET", "backups")
     monkeypatch.delenv("GDRIVE_FOLDER_ID", raising=False)
     Configuration().validate()  # no GDRIVE_* required when S3 is the backend
+
+
+def test_stream_errors_drop_the_signed_url(storage):
+    store, client = storage
+    signed = "https://itg-prod.s3.amazonaws.com/x.zip?X-Amz-Signature=deadbeef"
+    r = _response([])
+    r.raise_for_status.side_effect = requests.HTTPError(f"403 Forbidden for url: {signed}")
+    with patch("itglue_export.storage.s3.requests.get", return_value=r):
+        with pytest.raises(requests.HTTPError) as exc:
+            store.store_stream(signed, "a.zip")
+    assert "X-Amz" not in str(exc.value)

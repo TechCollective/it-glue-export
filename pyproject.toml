@@ -1,6 +1,6 @@
 [project]
 name = "it-glue-export"
-version = "1.1.0"
+version = "1.1.1"
 description = "Back up IT Glue with the Exports API and build a searchable single-file index"
 readme = "README.md"
 license = "MIT"
