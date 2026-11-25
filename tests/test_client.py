@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+import requests
 
 from itglue_export.client import ITGlueClient
 
@@ -47,6 +48,43 @@ def test_poll_returns_download_url(config):
     with patch("itglue_export.client.requests.get", side_effect=[pending, done]), \
          patch("itglue_export.client.time.sleep"):
         assert ITGlueClient(config).poll_export_status("42", poll_interval_sec=1) == "https://dl.example.test/x.zip"
+
+
+def test_check_export_returns_url_or_none(config):
+    pending = _response(200, {"data": {"attributes": {"status": "processing"}}})
+    done = _response(200, {"data": {"attributes": {"download-url": "https://dl.example.test/x.zip"}}})
+    with patch("itglue_export.client.requests.get", side_effect=[pending, done]) as get:
+        client = ITGlueClient(config)
+        assert client.check_export("42") is None
+        assert client.check_export("42") == "https://dl.example.test/x.zip"
+    assert get.call_count == 2
+    assert get.call_args.args[0].endswith("/exports/42")
+
+
+@pytest.mark.parametrize("status", [401, 429, 500])
+def test_check_export_raises_on_non_200(config, status):
+    with patch("itglue_export.client.requests.get", return_value=_response(status)), \
+         patch("itglue_export.client.time.sleep") as sleep:
+        with pytest.raises(requests.HTTPError) as exc:
+            ITGlueClient(config).check_export("42")
+    assert exc.value.response.status_code == status
+    sleep.assert_not_called()
+
+
+def test_poll_sleeps_longer_on_429(config):
+    limited = _response(429)
+    done = _response(200, {"data": {"attributes": {"download-url": "https://dl.example.test/x.zip"}}})
+    with patch("itglue_export.client.requests.get", side_effect=[limited, done]), \
+         patch("itglue_export.client.time.sleep") as sleep:
+        assert ITGlueClient(config).poll_export_status("42", poll_interval_sec=5) == "https://dl.example.test/x.zip"
+    sleep.assert_called_once_with(10)
+
+
+def test_poll_raises_on_other_errors(config):
+    with patch("itglue_export.client.requests.get", return_value=_response(500)), \
+         patch("itglue_export.client.time.sleep"):
+        with pytest.raises(requests.HTTPError):
+            ITGlueClient(config).poll_export_status("42", poll_interval_sec=1)
 
 
 def test_download_streams_to_file(config, tmp_path):

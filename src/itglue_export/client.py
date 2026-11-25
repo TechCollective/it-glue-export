@@ -87,33 +87,47 @@ class ITGlueClient:
         logger.info(f"Found existing matching export job. ID: {latest_id}")
         return str(latest_id)
 
+    def check_export(self, export_id: str) -> str | None:
+        """Check the export once: return its download URL, or None while it is still processing.
+
+        Any non-200 response, 429 included, raises requests.HTTPError so the caller decides how to back off.
+        """
+        response = requests.get(f"{self.config.api_endpoint}/exports/{export_id}", headers=self.headers, timeout=30)
+        if response.status_code != 200:
+            if response.status_code != 429:
+                logger.error(f"Failed to fetch export status. Status: {response.status_code}, Body: {response.text}")
+            raise requests.HTTPError(f"Export status check returned {response.status_code}", response=response)
+
+        attributes = response.json().get("data", {}).get("attributes", {})
+        download_url = attributes.get("download-url") or attributes.get("download_url")
+        status = attributes.get("status") or attributes.get("state")
+        status_msg = f"Status: '{status}'" if status else "Status: processing"
+        if download_url:
+            logger.info(f"Export complete! Download URL obtained. ({status_msg})")
+            return download_url
+        logger.info(f"Export {export_id} still in progress. ({status_msg})")
+        return None
+
     def poll_export_status(self, export_id: str, poll_interval_sec: int = 60, timeout_min: int = 120) -> str:
         """Poll until the export has a download URL and return it."""
-        url = f"{self.config.api_endpoint}/exports/{export_id}"
         start_time = time.time()
         timeout_sec = timeout_min * 60
 
         logger.info(f"Polling export status for ID {export_id} every {poll_interval_sec} seconds (Timeout: {timeout_min} min)...")
         while (time.time() - start_time) < timeout_sec:
-            response = requests.get(url, headers=self.headers, timeout=30)
-            if response.status_code == 429:
+            try:
+                download_url = self.check_export(export_id)
+            except requests.HTTPError as e:
+                if e.response is None or e.response.status_code != 429:
+                    raise
                 logger.warning("Rate limit hit during polling. Sleeping for a longer interval...")
                 time.sleep(poll_interval_sec * 2)
                 continue
-            elif response.status_code != 200:
-                logger.error(f"Failed to fetch export status. Status: {response.status_code}, Body: {response.text}")
-                response.raise_for_status()
-
-            attributes = response.json().get("data", {}).get("attributes", {})
-            download_url = attributes.get("download-url") or attributes.get("download_url")
-            status = attributes.get("status") or attributes.get("state")
-            status_msg = f"Status: '{status}'" if status else "Status: processing"
             if download_url:
-                logger.info(f"Export complete! Download URL obtained. ({status_msg})")
                 return download_url
 
             elapsed_min = int((time.time() - start_time) / 60)
-            logger.info(f"Export still in progress... Elapsed: {elapsed_min} min. ({status_msg})")
+            logger.info(f"Elapsed: {elapsed_min} min.")
             time.sleep(poll_interval_sec)
 
         raise TimeoutError(f"Export job did not complete within the {timeout_min} minute timeout period.")
