@@ -1,13 +1,27 @@
 import logging
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import requests
 
 from .config import Configuration
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def redacted_download_errors(download_url: str) -> Iterator[None]:
+    """Re-raise requests errors without the URL: its query string is a presigned credential for the backup."""
+    try:
+        yield
+    except requests.RequestException as e:
+        detail = f"HTTP {e.response.status_code}" if e.response is not None else type(e).__name__
+        raise type(e)(f"Download from {urlsplit(download_url).netloc} failed: {detail}", response=e.response) from None
+
 
 
 class ITGlueClient:
@@ -134,27 +148,28 @@ class ITGlueClient:
 
     def download_export(self, download_url: str, output_path: Path) -> int | None:
         """Stream the export archive to output_path. Returns the server's Content-Length, if it sent one."""
-        logger.info(f"Downloading archive from {download_url}...")
+        logger.info(f"Downloading archive from {urlsplit(download_url).netloc}...")
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # No IT Glue headers: the URL is presigned and extra headers break its signature.
-        response = requests.get(download_url, stream=True, timeout=120)
-        response.raise_for_status()
+        with redacted_download_errors(download_url):
+            # No IT Glue headers: the URL is presigned and extra headers break its signature.
+            response = requests.get(download_url, stream=True, timeout=120)
+            response.raise_for_status()
 
-        total = int(response.headers.get("content-length", 0))
-        downloaded = 0
-        last_log_time = time.time()
-        with open(output_path, "wb") as f:
-            for chunk in response.iter_content(chunk_size=1024 * 1024):
-                if not chunk:
-                    continue
-                f.write(chunk)
-                downloaded += len(chunk)
-                now = time.time()
-                if now - last_log_time > 10:
-                    percent = (downloaded / total * 100) if total else 0
-                    logger.info(f"Download progress: {downloaded / (1024*1024):.1f}MB / {total / (1024*1024):.1f}MB ({percent:.1f}%)")
-                    last_log_time = now
+            total = int(response.headers.get("content-length", 0))
+            downloaded = 0
+            last_log_time = time.time()
+            with open(output_path, "wb") as f:
+                for chunk in response.iter_content(chunk_size=1024 * 1024):
+                    if not chunk:
+                        continue
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    now = time.time()
+                    if now - last_log_time > 10:
+                        percent = (downloaded / total * 100) if total else 0
+                        logger.info(f"Download progress: {downloaded / (1024*1024):.1f}MB / {total / (1024*1024):.1f}MB ({percent:.1f}%)")
+                        last_log_time = now
 
         logger.info(f"Download completed successfully. Saved to: {output_path}")
         return total or None

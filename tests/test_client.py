@@ -95,3 +95,32 @@ def test_download_streams_to_file(config, tmp_path):
     with patch("itglue_export.client.requests.get", return_value=r):
         ITGlueClient(config).download_export("https://dl.example.test/x.zip", out)
     assert out.read_bytes() == b"abcdef"
+
+
+SIGNED_URL = "https://itg-prod.s3.amazonaws.com/exports/x.zip?X-Amz-Credential=AKIAEXAMPLE&X-Amz-Signature=deadbeef"
+
+
+def test_download_logs_host_only(config, tmp_path, caplog):
+    r = _response(200)
+    r.headers = {}
+    r.iter_content.return_value = [b"abc"]
+    with patch("itglue_export.client.requests.get", return_value=r), caplog.at_level("INFO"):
+        ITGlueClient(config).download_export(SIGNED_URL, tmp_path / "x.zip")
+    assert "itg-prod.s3.amazonaws.com" in caplog.text
+    assert "X-Amz" not in caplog.text and "/exports/x.zip" not in caplog.text
+
+
+@pytest.mark.parametrize("error", [
+    requests.HTTPError(f"403 Client Error: Forbidden for url: {SIGNED_URL}", response=_response(403)),
+    requests.ConnectionError(f"Max retries exceeded with url: {SIGNED_URL}"),
+    requests.exceptions.ChunkedEncodingError(f"Connection broken while reading {SIGNED_URL}"),
+])
+def test_download_errors_drop_the_signed_url(config, tmp_path, error):
+    r = _response(200)
+    r.headers = {}
+    r.iter_content.side_effect = error
+    with patch("itglue_export.client.requests.get", return_value=r):
+        with pytest.raises(type(error)) as exc:
+            ITGlueClient(config).download_export(SIGNED_URL, tmp_path / "x.zip")
+    assert "X-Amz" not in str(exc.value) and "itg-prod.s3.amazonaws.com" in str(exc.value)
+    assert exc.value.__suppress_context__
